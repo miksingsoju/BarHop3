@@ -3,7 +3,7 @@
 ESP final project: find lively bars around Katipunan, Maginhawa, Poblacion and BGC, and reserve a table.
 
 - `backend/`: Spring Boot REST service (Jersey, Spring Data JPA, Javax Validation, Retrofit, Scheduling), an Eclipse project built on the course `ProjectTemplate2024` / `SpringBootDependencies` setup.
-- `frontend/`: Next.js UI (to come), ported from the Django templates in github.com/miksingsoju/barhop.
+- `frontend/`: Next.js + Tailwind CSS UI, ported from the Django templates in github.com/miksingsoju/barhop. See `frontend/README.md`.
 - `docs/proposal.txt`: the project proposal (API spec), as text.
 
 ## Running the backend in Eclipse
@@ -26,6 +26,18 @@ On first start with an empty database, demo data is loaded (`barhop.seed=true`):
 There are 4 bars, each in a different activity status (Poblacion Rooftop PACKED, The Kati Taproom LIVELY, Maginhawa Social Club MODERATE, BGC Highline QUIET), 13 tables, 2 upcoming events, reviews, and two bookings for Paolo: one CONFIRMED that starts within 2 hours (so the reminder job texts him) and one PENDING. 32 extra `crowdNN@demo.barhop.ph` hoppers (password `crowdpass123`) supply the timed likes, because one hopper can only hold one active like per bar.
 
 To reseed: `DROP DATABASE barhop_db;` and restart.
+
+## Running the frontend
+
+With the backend running:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open http://localhost:3000 and log in with one of the demo accounts above.
 
 ## Code layout (`backend/src/app`)
 

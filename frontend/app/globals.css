@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* BarHop theme: colours from the original Metronic-based Django UI. */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+
+  --color-info: #7239ea;
+  --color-info-dark: #5014d0;
+  --color-info-light: #f8f5ff;
+  --color-main: #ac6dff;
+
+  --color-gray-100: #f9f9f9;
+  --color-gray-200: #f1f1f2;
+  --color-gray-300: #dbdfe9;
+  --color-gray-400: #b5b5c3;
+  --color-gray-500: #99a1b7;
+  --color-gray-600: #78829d;
+  --color-gray-700: #4b5675;
+  --color-gray-800: #252f4a;
+  --color-gray-900: #071437;
+
+  --color-success: #17c653;
+  --color-success-light: #dfffea;
+  --color-warning: #f6c000;
+  --color-warning-light: #fff8dd;
+  --color-danger: #f8285a;
+  --color-danger-light: #ffeef3;
+  --color-primary: #1b84ff;
+  --color-primary-light: #e9f3ff;
+
+  --shadow-card: 0 3px 4px 0 rgba(0, 0, 0, 0.03);
+  --shadow-lift: 0 10px 30px 0 rgba(82, 63, 105, 0.1);
+}
+
+@layer base {
+  body {
+    @apply bg-gray-200 text-gray-700 font-sans antialiased;
+  }
+  h1, h2, h3, h4, h5 {
+    @apply text-gray-800 font-semibold;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-gray-300/60 bg-white shadow-card;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-sm {
+    @apply px-4 py-2 text-xs;
+  }
+  .btn-info {
+    @apply bg-info text-white hover:bg-info-dark;
+  }
+  .btn-light {
+    @apply bg-gray-300 text-gray-700 hover:bg-info-light hover:text-info;
+  }
+  .btn-danger {
+    @apply bg-danger-light text-danger hover:bg-danger hover:text-white;
+  }
+  .btn-success {
+    @apply bg-success-light text-success hover:bg-success hover:text-white;
+  }
+  .input {
+    @apply w-full rounded-lg border border-gray-300 bg-gray-300 px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-500 outline-none transition focus:border-info/50 focus:bg-gray-200;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-gray-800;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold;
+  }
+  .link {
+    @apply font-semibold text-main hover:text-info;
+  }
+}
