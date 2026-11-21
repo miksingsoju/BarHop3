@@ -1,0 +1,1897 @@
+BarHop
+ESP Final Project Proposal 2026
+1. Group Members
+	•	Mikylla Cherrizse Cayago
+	•	Adara Rei Dimatulac
+2. Description of the App
+BarHop is a web service that helps the Ateneo community, especially students heading out after exams, org events, or Friday classes, find out which bars around Katipunan, Maginhawa, Poblacion, and BGC are lively right now and reserve a table ahead of time. Today this is mostly guesswork based on group chats and word of mouth.
+Bar Hoppers who are at a bar can give it a timed like. Each like counts toward the bar's activity for 90 minutes and then expires. From the number of active likes, BarHop gives each bar a status: QUIET (0–4), MODERATE (5–14), LIVELY (15–29), or PACKED (30+). A scheduled job removes expired likes every minute so the statuses stay current. Hoppers can also leave 0–5 star reviews, which stay on the bar's page and update its average rating, and they can reserve a table for a date, time window, and party size. BarHop will not book the same table twice for overlapping times.
+Bar Owners have separate accounts. They list their bars (only bars inside Metro Manila are accepted), register bookable tables, post events, and confirm reservations or mark them as no-shows. Through Twilio (called with Retrofit), BarHop texts the hopper when a booking is placed, confirmed, or cancelled, texts the owner when a new booking arrives, and sends the hopper a reminder about two hours before the reservation.
+This project builds on our earlier BarHop SRS and SDD. The backend is now a Spring Boot service (Jersey, Spring Data JPA, Javax Validation, Retrofit, Scheduling) instead of Django, and the user interface will be built in Next.js instead of Django templates.
+
+3. Controller Operations
+GET is used for retrieval and POST for all submits. Request and response bodies are JSON. Every error is returned in this format (validation errors also include an errors array listing each invalid field):
+{
+  "status": 404,
+  "error": "Not Found",
+  "message": "Bar with id 99 does not exist.",
+  "timestamp": "2026-11-20T21:05:12"
+}
+
+3.1 HopperController — /api/hoppers
+Register a Bar Hopper
+REST URL
+POST  /api/hoppers
+Description
+Creates a new Bar Hopper account.
+Parameters
+None
+Request body (JSON)
+{
+  "firstName": "Paolo",
+  "lastName": "Reyes",
+  "email": "paolo.reyes@student.ateneo.edu",
+  "password": "katipunan123",
+  "phoneNumber": "+639171234567"
+}
+Output (JSON)
+201 Created
+{
+  "id": 1,
+  "firstName": "Paolo",
+  "lastName": "Reyes",
+  "email": "paolo.reyes@student.ateneo.edu",
+  "phoneNumber": "+639171234567",
+  "createdAt": "2026-11-09T20:15:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+409 Conflict — An account with email 'paolo.reyes@student.ateneo.edu' already exists.
+Forwards to
+HopperComponent.registerHopper(HopperRequest)
+
+Hopper login
+REST URL
+POST  /api/hoppers/login
+Description
+Checks a Bar Hopper's email and password. The Next.js app stores the returned id in its session.
+Parameters
+None
+Request body (JSON)
+{
+  "email": "paolo.reyes@student.ateneo.edu",
+  "password": "katipunan123"
+}
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "firstName": "Paolo",
+  "lastName": "Reyes",
+  "email": "paolo.reyes@student.ateneo.edu",
+  "phoneNumber": "+639171234567",
+  "createdAt": "2026-11-09T20:15:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+401 Unauthorized — Invalid email or password.
+Forwards to
+HopperComponent.login(LoginRequest)
+
+List all Bar Hoppers
+REST URL
+GET  /api/hoppers
+Description
+Returns every registered Bar Hopper.
+Parameters
+None
+Output (JSON)
+200 OK
+[
+  {
+    "id": 1,
+    "firstName": "Paolo",
+    "lastName": "Reyes",
+    "email": "paolo.reyes@student.ateneo.edu",
+    "phoneNumber": "+639171234567",
+    "createdAt": "2026-11-09T20:15:00"
+  }
+]
+Error messages
+— — None. Returns an empty array if there are no hoppers.
+Forwards to
+HopperComponent.getAllHoppers()
+
+Get a Bar Hopper
+REST URL
+GET  /api/hoppers/{id}
+Description
+Returns one Bar Hopper's profile.
+Parameters
+id (path, Long) — hopper id
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "firstName": "Paolo",
+  "lastName": "Reyes",
+  "email": "paolo.reyes@student.ateneo.edu",
+  "phoneNumber": "+639171234567",
+  "createdAt": "2026-11-09T20:15:00"
+}
+Error messages
+404 Not Found — Hopper with id 99 does not exist.
+Forwards to
+HopperComponent.getHopper(Long id)
+
+Update a Bar Hopper
+REST URL
+POST  /api/hoppers/{id}/update
+Description
+Updates a hopper's name and phone number. Fields left out are not changed.
+Parameters
+id (path, Long)
+Request body (JSON)
+{
+  "firstName": "Paolo",
+  "lastName": "Reyes",
+  "phoneNumber": "+639175550000"
+}
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "firstName": "Paolo",
+  "lastName": "Reyes",
+  "email": "paolo.reyes@student.ateneo.edu",
+  "phoneNumber": "+639175550000",
+  "createdAt": "2026-11-09T20:15:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Hopper with id 99 does not exist.
+Forwards to
+HopperComponent.updateHopper(Long id, HopperUpdateRequest)
+
+Delete a Bar Hopper
+REST URL
+POST  /api/hoppers/{id}/delete
+Description
+Deletes the account along with its likes and reviews. Future reservations are cancelled first.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "message": "Hopper 1 deleted. 1 upcoming reservation was cancelled."
+}
+Error messages
+404 Not Found — Hopper with id 99 does not exist.
+Forwards to
+HopperComponent.deleteHopper(Long id)
+
+3.2 OwnerController — /api/owners
+Register a Bar Owner
+REST URL
+POST  /api/owners
+Description
+Creates a new Bar Owner account.
+Parameters
+None
+Request body (JSON)
+{
+  "firstName": "Carla",
+  "lastName": "Santos",
+  "email": "carla@katitaproom.ph",
+  "password": "taproom2026",
+  "phoneNumber": "+639189876543",
+  "businessName": "Kati Taproom Inc."
+}
+Output (JSON)
+201 Created
+{
+  "id": 1,
+  "firstName": "Carla",
+  "lastName": "Santos",
+  "email": "carla@katitaproom.ph",
+  "phoneNumber": "+639189876543",
+  "businessName": "Kati Taproom Inc.",
+  "barCount": 0,
+  "createdAt": "2026-11-09T19:00:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+409 Conflict — An account with email 'carla@katitaproom.ph' already exists.
+Forwards to
+OwnerComponent.registerOwner(OwnerRequest)
+
+Owner login
+REST URL
+POST  /api/owners/login
+Description
+Checks a Bar Owner's email and password.
+Parameters
+None
+Request body (JSON)
+{
+  "email": "carla@katitaproom.ph",
+  "password": "taproom2026"
+}
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "firstName": "Carla",
+  "lastName": "Santos",
+  "email": "carla@katitaproom.ph",
+  "phoneNumber": "+639189876543",
+  "businessName": "Kati Taproom Inc.",
+  "barCount": 1,
+  "createdAt": "2026-11-09T19:00:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+401 Unauthorized — Invalid email or password.
+Forwards to
+OwnerComponent.login(LoginRequest)
+
+List all Bar Owners
+REST URL
+GET  /api/owners
+Description
+Returns every registered Bar Owner.
+Parameters
+None
+Output (JSON)
+200 OK
+[
+  {
+    "id": 1,
+    "firstName": "Carla",
+    "lastName": "Santos",
+    "email": "carla@katitaproom.ph",
+    "phoneNumber": "+639189876543",
+    "businessName": "Kati Taproom Inc.",
+    "barCount": 1,
+    "createdAt": "2026-11-09T19:00:00"
+  }
+]
+Error messages
+— — None. Returns an empty array.
+Forwards to
+OwnerComponent.getAllOwners()
+
+Get a Bar Owner
+REST URL
+GET  /api/owners/{id}
+Description
+Returns one Bar Owner's profile.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "firstName": "Carla",
+  "lastName": "Santos",
+  "email": "carla@katitaproom.ph",
+  "phoneNumber": "+639189876543",
+  "businessName": "Kati Taproom Inc.",
+  "barCount": 1,
+  "createdAt": "2026-11-09T19:00:00"
+}
+Error messages
+404 Not Found — Owner with id 99 does not exist.
+Forwards to
+OwnerComponent.getOwner(Long id)
+
+Update a Bar Owner
+REST URL
+POST  /api/owners/{id}/update
+Description
+Updates an owner's name, phone number, and business name.
+Parameters
+id (path, Long)
+Request body (JSON)
+{
+  "firstName": "Carla",
+  "lastName": "Santos",
+  "phoneNumber": "+639189876543",
+  "businessName": "Kati Taproom Holdings"
+}
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "firstName": "Carla",
+  "lastName": "Santos",
+  "email": "carla@katitaproom.ph",
+  "phoneNumber": "+639189876543",
+  "businessName": "Kati Taproom Holdings",
+  "barCount": 1,
+  "createdAt": "2026-11-09T19:00:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Owner with id 99 does not exist.
+Forwards to
+OwnerComponent.updateOwner(Long id, OwnerUpdateRequest)
+
+Delete a Bar Owner
+REST URL
+POST  /api/owners/{id}/delete
+Description
+Deletes an owner account. This is only allowed when the owner has no bar listings left.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "message": "Owner 1 deleted."
+}
+Error messages
+404 Not Found — Owner with id 99 does not exist.
+409 Conflict — Owner 1 still has 2 bar listings. Delete them first.
+Forwards to
+OwnerComponent.deleteOwner(Long id)
+
+3.3 BarController — /api/bars
+List / search bars
+REST URL
+GET  /api/bars
+Description
+Returns bar listings with live activity. This is the home page feed (SRS 4.1).
+Parameters
+city (query, optional) — e.g. "Quezon City"
+search (query, optional) — part of a bar name, case-insensitive
+status (query, optional) — QUIET | MODERATE | LIVELY | PACKED
+sort (query, optional) — likes (default) or rating
+Output (JSON)
+200 OK
+[
+  {
+    "id": 1,
+    "name": "The Kati Taproom",
+    "city": "Quezon City",
+    "address": "312 Katipunan Ave, Loyola Heights",
+    "averageRating": 4.3,
+    "reviewCount": 12,
+    "activeLikeCount": 18,
+    "activityStatus": "LIVELY",
+    "imageUrl": "/images/bars/kati-taproom.jpg"
+  }
+]
+Error messages
+400 Bad Request — Invalid status 'BUSY'. Allowed values: QUIET, MODERATE, LIVELY, PACKED.
+400 Bad Request — Invalid sort 'name'. Allowed values: likes, rating.
+— — If nothing matches, an empty array is returned and the UI shows "No bars available" (REQ-4.1.6).
+Forwards to
+BarComponent.searchBars(String city, String search, String status, String sort)
+
+Get bar details
+REST URL
+GET  /api/bars/{id}
+Description
+Returns the full details of one bar.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "name": "The Kati Taproom",
+  "city": "Quezon City",
+  "address": "312 Katipunan Ave, Loyola Heights",
+  "averageRating": 4.3,
+  "reviewCount": 12,
+  "activeLikeCount": 18,
+  "activityStatus": "LIVELY",
+  "imageUrl": "/images/bars/kati-taproom.jpg",
+  "ownerId": 1,
+  "ownerName": "Carla Santos",
+  "description": "Neighborhood craft-beer bar a short walk from Gate 3.",
+  "openingTime": "18:00",
+  "closingTime": "02:00",
+  "capacity": 120,
+  "amenities": "Live band on Fridays, Outdoor seating, Darts",
+  "createdAt": "2026-11-09T19:05:00"
+}
+Error messages
+404 Not Found — Bar with id 99 does not exist.
+Forwards to
+BarComponent.getBar(Long id)
+
+List an owner's bars
+REST URL
+GET  /api/bars/owner/{ownerId}
+Description
+Returns all bars owned by one owner, for the owner dashboard.
+Parameters
+ownerId (path, Long)
+Output (JSON)
+200 OK
+[
+  {
+    "id": 1,
+    "name": "The Kati Taproom",
+    "city": "Quezon City",
+    "address": "312 Katipunan Ave, Loyola Heights",
+    "averageRating": 4.3,
+    "reviewCount": 12,
+    "activeLikeCount": 18,
+    "activityStatus": "LIVELY",
+    "imageUrl": "/images/bars/kati-taproom.jpg"
+  }
+]
+Error messages
+404 Not Found — Owner with id 99 does not exist.
+Forwards to
+BarComponent.getBarsByOwner(Long ownerId)
+
+Get live activity of a bar
+REST URL
+GET  /api/bars/{id}/activity
+Description
+Returns the current number of active (unexpired) likes and the activity status of a bar.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "barId": 1,
+  "activeLikeCount": 18,
+  "activityStatus": "LIVELY",
+  "asOf": "2026-11-20T21:05:12"
+}
+Error messages
+404 Not Found — Bar with id 99 does not exist.
+Forwards to
+LikeComponent.getActivity(Long barId)
+
+Create a bar
+REST URL
+POST  /api/bars
+Description
+An owner adds a bar listing. The city must be one of the 17 Metro Manila LGUs.
+Parameters
+None
+Request body (JSON)
+{
+  "ownerId": 1,
+  "name": "The Kati Taproom",
+  "description": "Neighborhood craft-beer bar a short walk from Gate 3.",
+  "address": "312 Katipunan Ave, Loyola Heights",
+  "city": "Quezon City",
+  "openingTime": "18:00",
+  "closingTime": "02:00",
+  "capacity": 120,
+  "amenities": "Live band on Fridays, Outdoor seating, Darts",
+  "imageUrl": "/images/bars/kati-taproom.jpg"
+}
+Output (JSON)
+201 Created
+{
+  "id": 1,
+  "name": "The Kati Taproom",
+  "city": "Quezon City",
+  "address": "312 Katipunan Ave, Loyola Heights",
+  "averageRating": 0,
+  "reviewCount": 0,
+  "activeLikeCount": 0,
+  "activityStatus": "QUIET",
+  "imageUrl": "/images/bars/kati-taproom.jpg",
+  "ownerId": 1,
+  "ownerName": "Carla Santos",
+  "description": "Neighborhood craft-beer bar a short walk from Gate 3.",
+  "openingTime": "18:00",
+  "closingTime": "02:00",
+  "capacity": 120,
+  "amenities": "Live band on Fridays, Outdoor seating, Darts",
+  "createdAt": "2026-11-09T19:05:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+400 Bad Request — City 'Antipolo' is outside Metro Manila. BarHop only accepts bars within Metro Manila.
+404 Not Found — Owner with id 99 does not exist.
+Forwards to
+BarComponent.createBar(BarRequest)
+
+Update a bar
+REST URL
+POST  /api/bars/{id}/update
+Description
+The bar's owner edits its details. The body is the same as Create.
+Parameters
+id (path, Long)
+Request body (JSON)
+{
+  "ownerId": 1,
+  "name": "The Kati Taproom",
+  "...": "same fields as Create",
+  "closingTime": "03:00"
+}
+Output (JSON)
+200 OK
+{
+  "id": 1,
+  "name": "The Kati Taproom",
+  "city": "Quezon City",
+  "address": "312 Katipunan Ave, Loyola Heights",
+  "averageRating": 4.3,
+  "reviewCount": 12,
+  "activeLikeCount": 18,
+  "activityStatus": "LIVELY",
+  "imageUrl": "/images/bars/kati-taproom.jpg",
+  "ownerId": 1,
+  "ownerName": "Carla Santos",
+  "description": "Neighborhood craft-beer bar a short walk from Gate 3.",
+  "openingTime": "18:00",
+  "closingTime": "03:00",
+  "capacity": 120,
+  "amenities": "Live band on Fridays, Outdoor seating, Darts",
+  "createdAt": "2026-11-09T19:05:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Bar with id 99 does not exist.
+403 Forbidden — Owner 2 does not own bar 1.
+Forwards to
+BarComponent.updateBar(Long id, BarRequest)
+
+Delete a bar
+REST URL
+POST  /api/bars/{id}/delete
+Description
+The bar's owner deletes the listing. Its tables, events, likes, and reviews are deleted too, and future reservations are cancelled (with an SMS to each hopper).
+Parameters
+id (path, Long)
+ownerId (query, Long, required)
+Output (JSON)
+200 OK
+{
+  "message": "Bar 1 deleted. 2 upcoming reservations were cancelled and the guests notified."
+}
+Error messages
+400 Bad Request — Query parameter 'ownerId' is required.
+404 Not Found — Bar with id 99 does not exist.
+403 Forbidden — Owner 2 does not own bar 1.
+Forwards to
+BarComponent.deleteBar(Long id, Long ownerId)
+
+3.4 TableController — /api/tables
+List a bar's tables
+REST URL
+GET  /api/tables
+Description
+Returns all tables registered under a bar.
+Parameters
+barId (query, Long, required)
+Output (JSON)
+200 OK
+[
+  {
+    "id": 3,
+    "barId": 1,
+    "label": "VIP Booth 1",
+    "tableType": "VIP",
+    "capacity": 8,
+    "rate": 5000,
+    "active": true
+  },
+  {
+    "id": 4,
+    "barId": 1,
+    "label": "Counter Seat 2",
+    "tableType": "SOLO",
+    "capacity": 1,
+    "rate": 0,
+    "active": true
+  }
+]
+Error messages
+400 Bad Request — Query parameter 'barId' is required.
+404 Not Found — Bar with id 99 does not exist.
+Forwards to
+TableComponent.getTablesForBar(Long barId)
+
+Find available tables
+REST URL
+GET  /api/tables/available
+Description
+Returns the tables that are free for a date, time window, and party size. The reservation calendar uses this (REQ-4.4.2/4.4.3).
+Parameters
+barId (query, Long, required)
+date (query, yyyy-MM-dd, required)
+startTime, endTime (query, HH:mm, required)
+guests (query, Integer, required, ≥ 1)
+Output (JSON)
+200 OK
+[
+  {
+    "id": 3,
+    "barId": 1,
+    "label": "VIP Booth 1",
+    "tableType": "VIP",
+    "capacity": 8,
+    "rate": 5000,
+    "active": true
+  }
+]
+Error messages
+400 Bad Request — Date 2026-11-01 is in the past.
+400 Bad Request — endTime must be after startTime.
+400 Bad Request — Requested time 15:00–17:00 is outside the bar's operating hours (18:00–02:00).
+404 Not Found — Bar with id 99 does not exist.
+Forwards to
+TableComponent.getAvailableTables(Long barId, LocalDate date, LocalTime start, LocalTime end, int guests)
+
+Get a table
+REST URL
+GET  /api/tables/{id}
+Description
+Returns one table.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "id": 3,
+  "barId": 1,
+  "label": "VIP Booth 1",
+  "tableType": "VIP",
+  "capacity": 8,
+  "rate": 5000,
+  "active": true
+}
+Error messages
+404 Not Found — Table with id 99 does not exist.
+Forwards to
+TableComponent.getTable(Long id)
+
+Create a table
+REST URL
+POST  /api/tables
+Description
+The bar's owner registers a bookable table.
+Parameters
+None
+Request body (JSON)
+{
+  "ownerId": 1,
+  "barId": 1,
+  "label": "VIP Booth 1",
+  "tableType": "VIP",
+  "capacity": 8,
+  "rate": 5000
+}
+Output (JSON)
+201 Created
+{
+  "id": 3,
+  "barId": 1,
+  "label": "VIP Booth 1",
+  "tableType": "VIP",
+  "capacity": 8,
+  "rate": 5000,
+  "active": true
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Bar with id 99 does not exist.
+403 Forbidden — Owner 2 does not own bar 1.
+409 Conflict — Bar 1 already has a table labelled 'VIP Booth 1'.
+Forwards to
+TableComponent.createTable(TableRequest)
+
+Update a table
+REST URL
+POST  /api/tables/{id}/update
+Description
+Edits a table's label, type, capacity, rate, or active flag.
+Parameters
+id (path, Long)
+Request body (JSON)
+{
+  "ownerId": 1,
+  "label": "VIP Booth 1",
+  "tableType": "VIP",
+  "capacity": 10,
+  "rate": 6000,
+  "active": true
+}
+Output (JSON)
+200 OK
+{
+  "id": 3,
+  "barId": 1,
+  "label": "VIP Booth 1",
+  "tableType": "VIP",
+  "capacity": 10,
+  "rate": 6000,
+  "active": true
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Table with id 99 does not exist.
+403 Forbidden — Owner 2 does not own bar 1.
+Forwards to
+TableComponent.updateTable(Long id, TableRequest)
+
+Delete a table
+REST URL
+POST  /api/tables/{id}/delete
+Description
+Deletes a table. This is not allowed while the table has upcoming PENDING or CONFIRMED reservations.
+Parameters
+id (path, Long)
+ownerId (query, Long, required)
+Output (JSON)
+200 OK
+{
+  "message": "Table 3 deleted."
+}
+Error messages
+404 Not Found — Table with id 99 does not exist.
+403 Forbidden — Owner 2 does not own bar 1.
+409 Conflict — Table 3 has 2 upcoming reservations. Cancel them or set the table inactive instead.
+Forwards to
+TableComponent.deleteTable(Long id, Long ownerId)
+
+3.5 EventController — /api/events
+List events
+REST URL
+GET  /api/events
+Description
+Returns events for one bar, or upcoming events at all bars (the Events page).
+Parameters
+barId (query, Long, optional)
+upcomingOnly (query, Boolean, optional, default true)
+Output (JSON)
+200 OK
+[
+  {
+    "id": 2,
+    "barId": 1,
+    "barName": "The Kati Taproom",
+    "title": "Post-Finals Acoustic Night",
+    "description": "Local student bands, 2-for-1 drafts until 10 PM.",
+    "startDateTime": "2026-12-11T20:00:00",
+    "endDateTime": "2026-12-12T01:00:00",
+    "coverCharge": 200
+  }
+]
+Error messages
+404 Not Found — Bar with id 99 does not exist.
+Forwards to
+EventComponent.getEvents(Long barId, boolean upcomingOnly)
+
+Get an event
+REST URL
+GET  /api/events/{id}
+Description
+Returns one event.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "id": 2,
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "title": "Post-Finals Acoustic Night",
+  "description": "Local student bands, 2-for-1 drafts until 10 PM.",
+  "startDateTime": "2026-12-11T20:00:00",
+  "endDateTime": "2026-12-12T01:00:00",
+  "coverCharge": 200
+}
+Error messages
+404 Not Found — Event with id 99 does not exist.
+Forwards to
+EventComponent.getEvent(Long id)
+
+Create an event
+REST URL
+POST  /api/events
+Description
+The bar's owner schedules an event.
+Parameters
+None
+Request body (JSON)
+{
+  "ownerId": 1,
+  "barId": 1,
+  "title": "Post-Finals Acoustic Night",
+  "description": "Local student bands, 2-for-1 drafts until 10 PM.",
+  "startDateTime": "2026-12-11T20:00:00",
+  "endDateTime": "2026-12-12T01:00:00",
+  "coverCharge": 200
+}
+Output (JSON)
+201 Created
+{
+  "id": 2,
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "title": "Post-Finals Acoustic Night",
+  "description": "Local student bands, 2-for-1 drafts until 10 PM.",
+  "startDateTime": "2026-12-11T20:00:00",
+  "endDateTime": "2026-12-12T01:00:00",
+  "coverCharge": 200
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+400 Bad Request — endDateTime must be after startDateTime.
+404 Not Found — Bar with id 99 does not exist.
+403 Forbidden — Owner 2 does not own bar 1.
+Forwards to
+EventComponent.createEvent(EventRequest)
+
+Delete an event
+REST URL
+POST  /api/events/{id}/delete
+Description
+The bar's owner removes an event.
+Parameters
+id (path, Long)
+ownerId (query, Long, required)
+Output (JSON)
+200 OK
+{
+  "message": "Event 2 deleted."
+}
+Error messages
+404 Not Found — Event with id 99 does not exist.
+403 Forbidden — Owner 2 does not own bar 1.
+Forwards to
+EventComponent.deleteEvent(Long id, Long ownerId)
+
+3.6 ReservationController — /api/reservations
+List reservations
+REST URL
+GET  /api/reservations
+Description
+Returns a hopper's bookings (My Bookings) or a bar's bookings for a date (the owner's bookings page). Give either hopperId or barId.
+Parameters
+hopperId (query, Long, optional)
+barId (query, Long, optional)
+date (query, yyyy-MM-dd, optional; only used with barId)
+Output (JSON)
+200 OK
+[
+  {
+    "id": 7,
+    "hopperId": 1,
+    "barId": 1,
+    "barName": "The Kati Taproom",
+    "tableId": 3,
+    "tableLabel": "VIP Booth 1",
+    "reservationDate": "2026-12-11",
+    "startTime": "21:00",
+    "endTime": "23:00",
+    "guestCount": 6,
+    "contactName": "Paolo Reyes",
+    "contactNumber": "+639171234567",
+    "status": "PENDING",
+    "agreedToPolicy": true,
+    "createdAt": "2026-11-20T21:05:12"
+  }
+]
+Error messages
+400 Bad Request — Provide either hopperId or barId.
+404 Not Found — Hopper with id 99 does not exist.
+Forwards to
+ReservationComponent.getReservations(Long hopperId, Long barId, LocalDate date)
+
+Get a reservation
+REST URL
+GET  /api/reservations/{id}
+Description
+Returns one reservation.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "id": 7,
+  "hopperId": 1,
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "tableId": 3,
+  "tableLabel": "VIP Booth 1",
+  "reservationDate": "2026-12-11",
+  "startTime": "21:00",
+  "endTime": "23:00",
+  "guestCount": 6,
+  "contactName": "Paolo Reyes",
+  "contactNumber": "+639171234567",
+  "status": "PENDING",
+  "agreedToPolicy": true,
+  "createdAt": "2026-11-20T21:05:12"
+}
+Error messages
+404 Not Found — Reservation with id 99 does not exist.
+Forwards to
+ReservationComponent.getReservation(Long id)
+
+Create a reservation
+REST URL
+POST  /api/reservations
+Description
+A hopper books a table. contactName and contactNumber are pre-filled from the profile by the UI. On success, an SMS is sent to the hopper and to the bar owner.
+Parameters
+None
+Request body (JSON)
+{
+  "hopperId": 1,
+  "tableId": 3,
+  "reservationDate": "2026-12-11",
+  "startTime": "21:00",
+  "endTime": "23:00",
+  "guestCount": 6,
+  "contactName": "Paolo Reyes",
+  "contactNumber": "+639171234567",
+  "agreedToPolicy": true
+}
+Output (JSON)
+201 Created
+{
+  "id": 7,
+  "hopperId": 1,
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "tableId": 3,
+  "tableLabel": "VIP Booth 1",
+  "reservationDate": "2026-12-11",
+  "startTime": "21:00",
+  "endTime": "23:00",
+  "guestCount": 6,
+  "contactName": "Paolo Reyes",
+  "contactNumber": "+639171234567",
+  "status": "PENDING",
+  "agreedToPolicy": true,
+  "createdAt": "2026-11-20T21:05:12"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+400 Bad Request — You must agree to the bar's house policies.
+400 Bad Request — Guest count 9 exceeds the capacity of 'VIP Booth 1' (8).
+404 Not Found — Table with id 99 does not exist.
+409 Conflict — 'VIP Booth 1' is already booked from 21:00 to 23:00 on 2026-12-11.
+Forwards to
+ReservationComponent.createReservation(ReservationRequest)
+
+Update reservation status (owner)
+REST URL
+POST  /api/reservations/{id}/status
+Description
+The bar's owner confirms a booking or marks it as a no-show. The hopper gets an SMS when it is confirmed.
+Parameters
+id (path, Long)
+Request body (JSON)
+{
+  "ownerId": 1,
+  "status": "CONFIRMED"
+}
+Output (JSON)
+200 OK
+{
+  "id": 7,
+  "hopperId": 1,
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "tableId": 3,
+  "tableLabel": "VIP Booth 1",
+  "reservationDate": "2026-12-11",
+  "startTime": "21:00",
+  "endTime": "23:00",
+  "guestCount": 6,
+  "contactName": "Paolo Reyes",
+  "contactNumber": "+639171234567",
+  "status": "CONFIRMED",
+  "agreedToPolicy": true,
+  "createdAt": "2026-11-20T21:05:12"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Reservation with id 99 does not exist.
+403 Forbidden — Owner 2 does not own the bar for reservation 7.
+409 Conflict — Cannot change a CANCELLED reservation to CONFIRMED.
+Forwards to
+ReservationComponent.updateStatus(Long id, StatusUpdateRequest)
+
+Cancel a reservation (hopper)
+REST URL
+POST  /api/reservations/{id}/cancel
+Description
+The hopper cancels their own booking. The table becomes free again and the owner gets an SMS.
+Parameters
+id (path, Long)
+hopperId (query, Long, required)
+Output (JSON)
+200 OK
+{
+  "id": 7,
+  "hopperId": 1,
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "tableId": 3,
+  "tableLabel": "VIP Booth 1",
+  "reservationDate": "2026-12-11",
+  "startTime": "21:00",
+  "endTime": "23:00",
+  "guestCount": 6,
+  "contactName": "Paolo Reyes",
+  "contactNumber": "+639171234567",
+  "status": "CANCELLED",
+  "agreedToPolicy": true,
+  "createdAt": "2026-11-20T21:05:12"
+}
+Error messages
+404 Not Found — Reservation with id 99 does not exist.
+403 Forbidden — Reservation 7 does not belong to hopper 2.
+409 Conflict — Reservation 7 is already COMPLETED and cannot be cancelled.
+Forwards to
+ReservationComponent.cancelReservation(Long id, Long hopperId)
+
+Delete a reservation record
+REST URL
+POST  /api/reservations/{id}/delete
+Description
+The bar's owner removes a CANCELLED, COMPLETED, or NO_SHOW record from their bookings page.
+Parameters
+id (path, Long)
+ownerId (query, Long, required)
+Output (JSON)
+200 OK
+{
+  "message": "Reservation 7 deleted."
+}
+Error messages
+404 Not Found — Reservation with id 99 does not exist.
+403 Forbidden — Owner 2 does not own the bar for reservation 7.
+409 Conflict — Only CANCELLED, COMPLETED or NO_SHOW reservations can be deleted.
+Forwards to
+ReservationComponent.deleteReservation(Long id, Long ownerId)
+
+3.7 ReviewController — /api/reviews
+List reviews
+REST URL
+GET  /api/reviews
+Description
+Returns a bar's reviews (bar page) or a hopper's reviews (profile page), newest first.
+Parameters
+barId (query, Long, optional)
+hopperId (query, Long, optional) — one of the two is required
+Output (JSON)
+200 OK
+[
+  {
+    "id": 4,
+    "hopperId": 1,
+    "hopperName": "Paolo Reyes",
+    "barId": 1,
+    "barName": "The Kati Taproom",
+    "rating": 5,
+    "comment": "Great music, quick service, fair prices.",
+    "visitDate": "2026-11-14",
+    "createdAt": "2026-11-15T10:12:00",
+    "updatedAt": "2026-11-15T10:12:00"
+  }
+]
+Error messages
+400 Bad Request — Provide either barId or hopperId.
+404 Not Found — Bar with id 99 does not exist.
+Forwards to
+ReviewComponent.getReviews(Long barId, Long hopperId)
+
+Get a review
+REST URL
+GET  /api/reviews/{id}
+Description
+Returns one review.
+Parameters
+id (path, Long)
+Output (JSON)
+200 OK
+{
+  "id": 4,
+  "hopperId": 1,
+  "hopperName": "Paolo Reyes",
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "rating": 5,
+  "comment": "Great music, quick service, fair prices.",
+  "visitDate": "2026-11-14",
+  "createdAt": "2026-11-15T10:12:00",
+  "updatedAt": "2026-11-15T10:12:00"
+}
+Error messages
+404 Not Found — Review with id 99 does not exist.
+Forwards to
+ReviewComponent.getReview(Long id)
+
+Create a review
+REST URL
+POST  /api/reviews
+Description
+A hopper reviews a bar (one review per bar). The bar's average rating is recalculated.
+Parameters
+None
+Request body (JSON)
+{
+  "hopperId": 1,
+  "barId": 1,
+  "rating": 5,
+  "comment": "Great music, quick service, fair prices.",
+  "visitDate": "2026-11-14"
+}
+Output (JSON)
+201 Created
+{
+  "id": 4,
+  "hopperId": 1,
+  "hopperName": "Paolo Reyes",
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "rating": 5,
+  "comment": "Great music, quick service, fair prices.",
+  "visitDate": "2026-11-14",
+  "createdAt": "2026-11-15T10:12:00",
+  "updatedAt": "2026-11-15T10:12:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+400 Bad Request — rating must be between 0 and 5.
+404 Not Found — Bar with id 99 does not exist.
+409 Conflict — You have already reviewed this bar. Edit your existing review instead.
+Forwards to
+ReviewComponent.createReview(ReviewRequest)
+
+Update a review
+REST URL
+POST  /api/reviews/{id}/update
+Description
+The author edits their review. The average rating is recalculated.
+Parameters
+id (path, Long)
+Request body (JSON)
+{
+  "hopperId": 1,
+  "rating": 4,
+  "comment": "Still great, but it got very crowded after 11.",
+  "visitDate": "2026-11-14"
+}
+Output (JSON)
+200 OK
+{
+  "id": 4,
+  "hopperId": 1,
+  "hopperName": "Paolo Reyes",
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "rating": 4,
+  "comment": "Still great, but it got very crowded after 11.",
+  "visitDate": "2026-11-14",
+  "createdAt": "2026-11-15T10:12:00",
+  "updatedAt": "2026-11-16T09:00:00"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Review with id 99 does not exist.
+403 Forbidden — Review 4 does not belong to hopper 2.
+Forwards to
+ReviewComponent.updateReview(Long id, ReviewRequest)
+
+Delete a review
+REST URL
+POST  /api/reviews/{id}/delete
+Description
+The author deletes their review. The average rating is recalculated.
+Parameters
+id (path, Long)
+hopperId (query, Long, required)
+Output (JSON)
+200 OK
+{
+  "message": "Review 4 deleted.",
+  "barId": 1,
+  "newAverageRating": 4.2
+}
+Error messages
+404 Not Found — Review with id 99 does not exist.
+403 Forbidden — Review 4 does not belong to hopper 2.
+Forwards to
+ReviewComponent.deleteReview(Long id, Long hopperId)
+
+3.8 LikeController — /api/likes
+Like a bar (timed like)
+REST URL
+POST  /api/likes
+Description
+A hopper likes a bar. The like expires 90 minutes later. The bar's like count and activity status are updated right away.
+Parameters
+None
+Request body (JSON)
+{
+  "hopperId": 1,
+  "barId": 1
+}
+Output (JSON)
+201 Created
+{
+  "id": 31,
+  "hopperId": 1,
+  "barId": 1,
+  "barName": "The Kati Taproom",
+  "likedAt": "2026-11-20T21:05:12",
+  "expiresAt": "2026-11-20T22:35:12",
+  "barActiveLikeCount": 19,
+  "barActivityStatus": "LIVELY"
+}
+Error messages
+400 Bad Request — Validation failed — returned in the standard error format with an `errors` array listing each invalid field.
+404 Not Found — Bar with id 99 does not exist.
+409 Conflict — You already have an active like on this bar. It expires at 22:35.
+Forwards to
+LikeComponent.likeBar(LikeRequest)
+
+List active likes
+REST URL
+GET  /api/likes
+Description
+Returns unexpired likes for a bar, or a hopper's unexpired likes (so the UI can show "Liked" on those bars).
+Parameters
+barId (query, Long, optional)
+hopperId (query, Long, optional) — one of the two is required
+Output (JSON)
+200 OK
+[
+  {
+    "id": 31,
+    "hopperId": 1,
+    "barId": 1,
+    "barName": "The Kati Taproom",
+    "likedAt": "2026-11-20T21:05:12",
+    "expiresAt": "2026-11-20T22:35:12",
+    "barActiveLikeCount": 19,
+    "barActivityStatus": "LIVELY"
+  }
+]
+Error messages
+400 Bad Request — Provide either barId or hopperId.
+404 Not Found — Hopper with id 99 does not exist.
+Forwards to
+LikeComponent.getActiveLikes(Long barId, Long hopperId)
+
+Remove a like
+REST URL
+POST  /api/likes/{id}/delete
+Description
+The hopper takes back a like before it expires (for example, after leaving the bar).
+Parameters
+id (path, Long)
+hopperId (query, Long, required)
+Output (JSON)
+200 OK
+{
+  "message": "Like 31 removed.",
+  "barId": 1,
+  "barActiveLikeCount": 18,
+  "barActivityStatus": "LIVELY"
+}
+Error messages
+404 Not Found — Like with id 99 does not exist or has already expired.
+403 Forbidden — Like 31 does not belong to hopper 2.
+Forwards to
+LikeComponent.removeLike(Long id, Long hopperId)
+
+
+4. Components
+Each component is a Spring @Component (business methods are @Transactional). Controllers get them through @Autowired. For each important method, the steps below are what the method does, in order.
+4.1 HopperComponent
+Handles Bar Hopper accounts: registration, login, profile updates, and deletion. It makes sure one email cannot be both a hopper and an owner (SRS 2.5).
+registerHopper(HopperRequest req)
+	•	Normalize the email (trim, lowercase).
+	•	If hopperRepository.existsByEmailIgnoreCase(email) or ownerRepository.existsByEmailIgnoreCase(email) → throw 409 Conflict.
+	•	Hash the password with BCrypt.
+	•	Build a Hopper entity, set createdAt = now(), and save it.
+	•	Return a HopperResponse DTO without the password.
+login(LoginRequest req)
+	•	Look up hopperRepository.findByEmailIgnoreCase(email); if not found → 401.
+	•	Compare the password with the stored BCrypt hash; if it does not match → 401.
+	•	Return a HopperResponse.
+getAllHoppers() / getHopper(Long id)
+	•	Call findAll() or findById(id) (throw 404 if empty).
+	•	Map the entities to response DTOs.
+updateHopper(Long id, HopperUpdateRequest req)
+	•	Load the hopper or throw 404.
+	•	Copy over the non-null fields (first name, last name, phone number).
+	•	Save and return the DTO.
+deleteHopper(Long id)
+	•	Load the hopper or throw 404.
+	•	Find upcoming PENDING/CONFIRMED reservations with reservationRepository.findByHopperIdAndStatusIn(...) and call ReservationComponent.cancelBySystem(...) on each (this notifies the owner).
+	•	Delete the hopper's likes (timedLikeRepository.deleteByHopperId) and reviews. Recalculate the average rating of every bar the hopper reviewed.
+	•	Delete the hopper and return a summary message.
+4.2 OwnerComponent
+Handles Bar Owner accounts. Its methods mirror HopperComponent.
+registerOwner(OwnerRequest req)
+	•	Normalize the email; throw 409 if a hopper or owner already uses it.
+	•	Hash the password, build the Owner, set createdAt, and save.
+	•	Return an OwnerResponse with barCount = 0.
+login(LoginRequest req)
+	•	ownerRepository.findByEmailIgnoreCase(email) → 401 if not found.
+	•	Check the BCrypt hash → 401 if it does not match.
+	•	Return an OwnerResponse with barCount = barRepository.countByOwnerId(id).
+getAllOwners() / getOwner(Long id) / updateOwner(...)
+	•	Load the owner(s), or throw 404.
+	•	For updates, copy the non-null fields and save.
+	•	Map to DTOs, filling in barCount.
+deleteOwner(Long id)
+	•	Load the owner or throw 404.
+	•	If barRepository.countByOwnerId(id) > 0 → throw 409.
+	•	Delete the owner and return a message.
+4.3 BarComponent
+Handles bar listings: search, details, and owner-only create/update/delete. It enforces the Metro Manila rule and keeps each bar's average rating up to date.
+searchBars(String city, String search, String status, String sort)
+	•	Check that status is an ActivityStatus value and sort is likes or rating; otherwise throw 400.
+	•	Choose a repository query: findByNameContainingIgnoreCase when search is given, findByCityIgnoreCase when city is given, findByActivityStatus when status is given, otherwise findAllByOrderByActiveLikeCountDesc().
+	•	Apply any remaining filters in memory.
+	•	Sort by activeLikeCount (default) or averageRating, highest first.
+	•	Map to BarSummary DTOs (an empty list is a valid result).
+getBar(Long id)
+	•	barRepository.findById(id) or throw 404.
+	•	Map to BarDetail, including the owner's name and the review count.
+createBar(BarRequest req)
+	•	Load the owner by req.ownerId or throw 404.
+	•	Check that req.city is in the METRO_MANILA_CITIES set (the 17 LGUs); otherwise throw 400.
+	•	Build the Bar with averageRating = 0, activeLikeCount = 0, activityStatus = QUIET, and createdAt = now().
+	•	Save and return a BarDetail.
+updateBar(Long id, BarRequest req)
+	•	Load the bar or throw 404.
+	•	If bar.owner.id != req.ownerId → throw 403.
+	•	Check the Metro Manila city again, copy the fields, and save.
+deleteBar(Long id, Long ownerId)
+	•	Load the bar, check ownership (403).
+	•	Cancel upcoming reservations through ReservationComponent.cancelBySystem(...), which texts each hopper.
+	•	Delete the bar. Tables, events, likes, and reviews are removed through CascadeType.REMOVE.
+	•	Return the number of reservations that were cancelled.
+recalculateRating(Long barId)
+	•	Call reviewRepository.averageRatingForBar(barId) (null → 0.0).
+	•	Round to one decimal place, store it in bar.averageRating, and save. ReviewComponent calls this.
+4.4 TableComponent
+Handles each bar's bookable tables and works out which ones are free for a time slot.
+getTablesForBar(Long barId)
+	•	Check that the bar exists (404).
+	•	Return barTableRepository.findByBarIdOrderByLabelAsc(barId) as DTOs.
+getAvailableTables(Long barId, LocalDate date, LocalTime start, LocalTime end, int guests)
+	•	Check that the bar exists (404), the date is not in the past, end is after start (an overnight slot is allowed when the bar closes after midnight), and the slot falls within operating hours. Otherwise throw 400.
+	•	Get candidate tables with barTableRepository.findByBarIdAndActiveTrueAndCapacityGreaterThanEqual(barId, guests).
+	•	For each candidate, drop it if reservationRepository.existsByTableIdAndReservationDateAndStartTimeLessThanAndEndTimeGreaterThanAndStatusIn(tableId, date, end, start, [PENDING, CONFIRMED]) is true.
+	•	Return the remaining tables, smallest capacity first.
+createTable / updateTable(...)
+	•	Load the bar or table (404) and check that the caller owns the bar (403).
+	•	When creating, throw 409 if existsByBarIdAndLabelIgnoreCase is true.
+	•	Save and return the DTO.
+deleteTable(Long id, Long ownerId)
+	•	Load the table and check ownership.
+	•	If reservationRepository.countByTableIdAndReservationDateGreaterThanEqualAndStatusIn(id, today, [PENDING, CONFIRMED]) > 0 → throw 409.
+	•	Delete the table.
+4.5 EventComponent
+Handles event schedules for bars.
+getEvents(Long barId, boolean upcomingOnly)
+	•	If barId is given, check that the bar exists (404).
+	•	Use findByBarIdAndStartDateTimeAfterOrderByStartDateTimeAsc, findByBarIdOrderByStartDateTimeAsc, or findByStartDateTimeAfterOrderByStartDateTimeAsc, depending on the parameters.
+	•	Map to DTOs.
+createEvent(EventRequest req)
+	•	Load the bar (404) and check ownership (403).
+	•	Check that endDateTime is after startDateTime (400).
+	•	Save and return the DTO.
+deleteEvent(Long id, Long ownerId)
+	•	Load the event (404) and check ownership (403), then delete.
+4.6 ReservationComponent
+Handles table bookings from start to finish. It enforces capacity, operating hours, and no double booking, and triggers the SMS notifications.
+createReservation(ReservationRequest req)
+	•	Load the hopper and the table (404 for either). Get the bar from the table.
+	•	If agreedToPolicy is not true → 400. If guestCount > table.capacity → 400.
+	•	Call TableComponent.validateSlot(bar, date, start, end) to check the date, time order, and operating hours (400).
+	•	Check for overlaps with existsByTableIdAndReservationDateAndStartTimeLessThanAndEndTimeGreaterThanAndStatusIn(...); if any → 409.
+	•	Save a Reservation with status = PENDING, reminderSent = false, and createdAt = now().
+	•	Call NotificationComponent.reservationPlaced(reservation), which texts the hopper and the owner (failures are logged only).
+	•	Return the DTO.
+updateStatus(Long id, StatusUpdateRequest req)
+	•	Load the reservation (404) and check that req.ownerId owns its bar (403).
+	•	Check the change is allowed: PENDING → CONFIRMED/CANCELLED; CONFIRMED → NO_SHOW/COMPLETED/CANCELLED. Anything else → 409.
+	•	Save the change. If the new status is CONFIRMED, call NotificationComponent.reservationConfirmed(...); if CANCELLED, call reservationCancelledByBar(...).
+cancelReservation(Long id, Long hopperId)
+	•	Load the reservation (404) and check the hopper owns it (403).
+	•	If the status is COMPLETED, NO_SHOW, or CANCELLED → 409.
+	•	Set the status to CANCELLED, save, and call NotificationComponent.reservationCancelledByHopper(...).
+getReservations(Long hopperId, Long barId, LocalDate date)
+	•	If neither id is given → 400.
+	•	For a hopper: findByHopperIdOrderByReservationDateDescStartTimeDesc. For a bar: findByTableBarIdAndReservationDateOrderByStartTimeAsc when date is given, otherwise findByTableBarIdAndReservationDateGreaterThanEqualOrderByReservationDateAsc(today).
+	•	Map to DTOs.
+deleteReservation(Long id, Long ownerId)
+	•	Load the reservation and check the owner (404/403).
+	•	Throw 409 unless the status is CANCELLED, COMPLETED, or NO_SHOW.
+	•	Delete it.
+sendUpcomingReminders()  (called by the scheduler)
+	•	Compute now and now + 2h (Asia/Manila).
+	•	Get findByStatusAndReminderSentFalseAndReservationDate(CONFIRMED, today) (also tomorrow's early-morning slots when the window crosses midnight).
+	•	For each booking whose start time falls in the window, call NotificationComponent.reservationReminder(...) and set reminderSent = true.
+	•	Save them all.
+closeOutPastReservations()  (called by the scheduler)
+	•	Get findByReservationDateBeforeAndStatusIn(today, [PENDING, CONFIRMED]).
+	•	Set CONFIRMED → COMPLETED and PENDING (never confirmed) → CANCELLED.
+	•	Save them all and log the counts.
+4.7 ReviewComponent
+Handles reviews and ratings that do not expire (SRS 4.3), and keeps each bar's average rating correct.
+createReview(ReviewRequest req)
+	•	Load the hopper and bar (404).
+	•	If reviewRepository.existsByHopperIdAndBarId(...) → 409.
+	•	Save the review with createdAt = updatedAt = now().
+	•	Call BarComponent.recalculateRating(barId) and return the DTO.
+updateReview(Long id, ReviewRequest req)
+	•	Load the review (404) and check the author (403).
+	•	Update the rating, comment, and visit date, set updatedAt, and save.
+	•	Recalculate the bar's rating.
+deleteReview(Long id, Long hopperId)
+	•	Load the review and check the author.
+	•	Delete it, recalculate the bar's rating, and return the new average.
+getReviews(Long barId, Long hopperId)
+	•	Throw 400 if neither id is given; throw 404 if the given parent does not exist.
+	•	findByBarIdOrderByCreatedAtDesc or findByHopperIdOrderByCreatedAtDesc → DTOs.
+4.8 LikeComponent
+Handles timed likes and works out each bar's live activity status (SRS 4.1 and 4.2).
+likeBar(LikeRequest req)
+	•	Load the hopper and bar (404).
+	•	If timedLikeRepository.existsByHopperIdAndBarIdAndExpiresAtAfter(hopperId, barId, now) → 409, giving the existing expiry time.
+	•	Save a TimedLike with likedAt = now and expiresAt = now + 90 min.
+	•	Call refreshBarActivity(bar) and return the like with the bar's new count and status.
+removeLike(Long id, Long hopperId)
+	•	Load the like (404, also when it has already expired) and check the hopper (403).
+	•	Delete it and call refreshBarActivity(bar).
+getActiveLikes(Long barId, Long hopperId) / getActivity(Long barId)
+	•	Check the parameters (400) and that the bar or hopper exists (404).
+	•	Use findByBarIdAndExpiresAtAfter(barId, now) or findByHopperIdAndExpiresAtAfter(hopperId, now); for activity, countByBarIdAndExpiresAtAfter(barId, now).
+	•	Return the DTOs.
+refreshBarActivity(Bar bar)
+	•	count = timedLikeRepository.countByBarIdAndExpiresAtAfter(bar.id, now).
+	•	status = count ≥ 30 ? PACKED : count ≥ 15 ? LIVELY : count ≥ 5 ? MODERATE : QUIET.
+	•	Save bar.activeLikeCount and bar.activityStatus.
+expireLikes()  (called by the scheduler)
+	•	expired = timedLikeRepository.findByExpiresAtBefore(now).
+	•	Collect the set of affected bar ids, then call deleteAllInBatch(expired).
+	•	Call refreshBarActivity for each affected bar, and return the number of likes removed for logging.
+4.9 NotificationComponent (Twilio through Retrofit)
+Builds SMS messages and sends them through the Twilio Messaging API. It uses a Retrofit interface TwilioApi (@FormUrlEncoded @POST("2010-04-01/Accounts/{accountSid}/Messages.json") with @Field("To"), @Field("From"), @Field("Body")). A RetrofitConfig @Configuration creates it with base URL https://api.twilio.com/, a Jackson converter, and an OkHttp interceptor that adds HTTP Basic auth from twilio.account-sid and twilio.auth-token in application.properties.
+sendSms(String to, String body)
+	•	Skip the send and log it if twilio.enabled=false (local or offline demos).
+	•	Call twilioApi.sendMessage(accountSid, to, fromNumber, body).execute().
+	•	If the response is successful, log the returned message sid; otherwise log the Twilio error code. Never throw to the caller.
+reservationPlaced / reservationConfirmed / reservationCancelledByHopper / reservationCancelledByBar / reservationReminder(Reservation r)
+	•	Write the message text, e.g. "BarHop: Your table VIP Booth 1 at The Kati Taproom on Dec 11, 21:00–23:00 for 6 is PENDING. Ref #7."
+	•	Choose the recipients (the hopper's contactNumber, the owner's phoneNumber, or both).
+	•	Call sendSms for each recipient.
+4.10 ScheduledTasks
+A @Component with @EnableScheduling on the application class. It only calls other components on a timer.
+@Scheduled(fixedRate = 60000) expireTimedLikes()
+	•	Call LikeComponent.expireLikes().
+	•	Log how many likes were removed and how many bars were updated.
+@Scheduled(cron = "0 */15 * * * *", zone = "Asia/Manila") sendReservationReminders()
+	•	Call ReservationComponent.sendUpcomingReminders() every 15 minutes.
+@Scheduled(cron = "0 0 6 * * *", zone = "Asia/Manila") closeOutReservations()
+	•	Every day at 6:00 AM, after the bars close, call ReservationComponent.closeOutPastReservations().
+4.11 DataInitializer (@PostConstruct)
+Loads demo data when the app starts so the skeleton and the demo video have something to show. It only runs when the barhop.seed=true property is set and the database is empty.
+@PostConstruct seedDatabase()
+	•	If barhop.seed is false or ownerRepository.count() > 0, return.
+	•	Create 2 owners and 3 hoppers (BCrypt-hashed demo passwords).
+	•	Create 4 bars in Quezon City (Katipunan, Maginhawa), Makati (Poblacion), and Taguig (BGC), each linked to an owner.
+	•	Create 3–4 tables per bar (SOLO, GROUP, VIP).
+	•	Create 2 upcoming events.
+	•	Create sample reviews, then call BarComponent.recalculateRating for each bar.
+	•	Create a few timed likes with different likedAt times (some close to expiring), then call LikeComponent.refreshBarActivity so the bars show different statuses.
+	•	Create sample reservations: one PENDING and one CONFIRMED for later today, so the reminder job can be shown working.
+
+5. Entities and Repositories
+5.1 Entities
+BarHop has eight JPA entities, based on the data dictionary in the original SDD. All ids are Long and generated with @GeneratedValue(strategy = IDENTITY). Each entity is listed with what it represents, why it needs its own table, and its fields with validation rules.
+5.1.1 Hopper
+A Bar Hopper, meaning a student or customer who browses, likes, reviews, and reserves. Hoppers own likes, reviews, and reservations, and their phone number is where SMS messages go. The original SRS says hoppers and owners are separate account types, so each gets its own table instead of one table with a role flag.
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key, generated.
+firstName
+String
+@NotBlank, @Size(max = 50). Not null.
+lastName
+String
+@NotBlank, @Size(max = 50). Not null.
+email
+String
+@NotBlank, @Email, @Size(max = 100). Not null, unique (and not used by any Owner).
+passwordHash
+String
+Not null. BCrypt hash; the raw password is @Size(min = 8, max = 72) on the request DTO.
+phoneNumber
+String
+@NotBlank, @Pattern("^\+639\d{9}$") (PH mobile, E.164 format for Twilio). Not null.
+createdAt
+LocalDateTime
+Not null; set by the server.
+likes / reviews / reservations
+List<…>
+@OneToMany(mappedBy = "hopper"); likes and reviews use cascade REMOVE.
+
+5.1.2 Owner
+A Bar Owner, meaning a business account that manages bar listings and bookings. Owners can do things hoppers cannot (manage bars, confirm reservations) and receive their own SMS alerts. Bar ownership checks (403) depend on this link.
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key, generated.
+firstName / lastName
+String
+@NotBlank, @Size(max = 50). Not null.
+email
+String
+@NotBlank, @Email. Not null, unique (and not used by any Hopper).
+passwordHash
+String
+Not null (BCrypt).
+phoneNumber
+String
+@NotBlank, @Pattern("^\+639\d{9}$"). Not null.
+businessName
+String
+@Size(max = 100). Nullable.
+createdAt
+LocalDateTime
+Not null.
+bars
+List<Bar>
+@OneToMany(mappedBy = "owner").
+
+5.1.3 Bar
+A bar or club listed on BarHop. This is the main record the whole service is built around. Tables, events, likes, reviews, and (through tables) reservations all belong to a bar. It also stores the computed activeLikeCount, activityStatus, and averageRating so listing pages load quickly.
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key.
+owner
+Owner
+@ManyToOne(optional = false), @NotNull.
+name
+String
+@NotBlank, @Size(max = 100). Not null.
+description
+String
+@Size(max = 1000). Nullable.
+address
+String
+@NotBlank, @Size(max = 200). Not null.
+city
+String
+@NotBlank; must be one of the 17 Metro Manila LGUs (checked in BarComponent).
+openingTime / closingTime
+LocalTime
+@NotNull. closingTime may be after midnight (overnight hours).
+capacity
+Integer
+@NotNull, @Min(1), @Max(5000).
+amenities
+String
+@Size(max = 500). Nullable.
+imageUrl
+String
+@Size(max = 300). Nullable.
+averageRating
+Double
+Not null, default 0.0; 0.0–5.0. Computed by the server.
+activeLikeCount
+Integer
+Not null, default 0, ≥ 0. Computed by the server.
+activityStatus
+Enum ActivityStatus
+@Enumerated(STRING), not null: QUIET | MODERATE | LIVELY | PACKED.
+createdAt
+LocalDateTime
+Not null.
+
+5.1.4 BarTable
+A physical table in a bar that can be booked (SDD "Table" entity). The class is named BarTable because TABLE is a reserved word in SQL. Reservations book a specific table, so the service needs each table's capacity and type to check party size and prevent double booking (REQ-4.4.4).
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key.
+bar
+Bar
+@ManyToOne(optional = false), @NotNull.
+label
+String
+@NotBlank, @Size(max = 50); unique within a bar.
+tableType
+Enum TableType
+@NotNull: SOLO | GROUP | VIP.
+capacity
+Integer
+@NotNull, @Min(1), @Max(30).
+rate
+BigDecimal
+@NotNull, @DecimalMin("0.00"), @Digits(integer = 7, fraction = 2) — minimum spend or table fee in PHP.
+active
+Boolean
+Not null, default true. Inactive tables cannot be booked.
+
+5.1.5 Event
+A scheduled event at a bar (live band, theme night, promo). Bar owners promote events (SRS 1.4) and the Events page lists upcoming ones. Events have their own dates and times, which do not fit on the Bar record.
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key.
+bar
+Bar
+@ManyToOne(optional = false), @NotNull.
+title
+String
+@NotBlank, @Size(max = 100).
+description
+String
+@Size(max = 1000). Nullable.
+startDateTime
+LocalDateTime
+@NotNull, @Future (on create).
+endDateTime
+LocalDateTime
+@NotNull; must be after startDateTime (checked in the component).
+coverCharge
+BigDecimal
+@DecimalMin("0.00"). Nullable (null = free entry).
+
+5.1.6 Reservation
+A hopper's booking of a table for a date and time window. This is the core record of the booking feature. Overlap checks, reminder SMS, and the owner's bookings page all depend on it. It also replaces the SDD's Visit entity: a COMPLETED reservation records a visit.
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key.
+hopper
+Hopper
+@ManyToOne(optional = false), @NotNull.
+table
+BarTable
+@ManyToOne(optional = false), @NotNull (the bar is reached through the table).
+reservationDate
+LocalDate
+@NotNull, @FutureOrPresent.
+startTime / endTime
+LocalTime
+@NotNull; endTime after startTime (or overnight); within operating hours.
+guestCount
+Integer
+@NotNull, @Min(1); ≤ table capacity.
+contactName
+String
+@NotBlank, @Size(max = 100).
+contactNumber
+String
+@NotBlank, @Pattern("^\+639\d{9}$").
+agreedToPolicy
+Boolean
+@NotNull, @AssertTrue (house-rules checkbox, SDD 6.2).
+status
+Enum ReservationStatus
+Not null: PENDING | CONFIRMED | CANCELLED | COMPLETED | NO_SHOW. Starts as PENDING.
+reminderSent
+Boolean
+Not null, default false.
+createdAt
+LocalDateTime
+Not null.
+
+5.1.7 Review
+A hopper's star rating and written review of a bar. Reviews do not expire (REQ-4.3.3), are shown on both the bar page and the hopper's profile, and are used to compute the bar's average rating.
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key.
+hopper
+Hopper
+@ManyToOne(optional = false), @NotNull.
+bar
+Bar
+@ManyToOne(optional = false), @NotNull. Unique together with hopper (one review per bar).
+rating
+Integer
+@NotNull, @Min(0), @Max(5) (REQ-4.3.2).
+comment
+String
+@Size(max = 1000). Nullable (a rating without text is allowed).
+visitDate
+LocalDate
+@PastOrPresent. Nullable.
+createdAt / updatedAt
+LocalDateTime
+Not null; set by the server.
+
+5.1.8 TimedLike
+A hopper's "I'm here and it's lively" signal for a bar, which lasts 90 minutes. Timed likes drive the activity status (SRS 4.2). Each like needs its own timestamp and expiry so the scheduler can remove it after 90 minutes, which is why this is a separate table and not a counter on Bar.
+Field
+Type
+Validation / nullability
+id
+Long
+Primary key.
+hopper
+Hopper
+@ManyToOne(optional = false), @NotNull.
+bar
+Bar
+@ManyToOne(optional = false), @NotNull.
+likedAt
+LocalDateTime
+@NotNull; set by the server.
+expiresAt
+LocalDateTime
+@NotNull; always likedAt + 90 minutes. Indexed for the expiry job.
+
+5.2 Repositories
+Each entity has a Spring Data repository that extends JpaRepository<Entity, Long>, which provides save, findById, findAll, deleteById, and count. The custom methods are listed below.
+5.2.1 HopperRepository
+Method
+Parameters
+Purpose
+Optional<Hopper> findByEmailIgnoreCase
+String email
+Login lookup.
+boolean existsByEmailIgnoreCase
+String email
+Duplicate-email check when a hopper or owner registers.
+
+5.2.2 OwnerRepository
+Method
+Parameters
+Purpose
+Optional<Owner> findByEmailIgnoreCase
+String email
+Login lookup.
+boolean existsByEmailIgnoreCase
+String email
+Duplicate-email check when a hopper or owner registers.
+
+5.2.3 BarRepository
+Method
+Parameters
+Purpose
+List<Bar> findAllByOrderByActiveLikeCountDesc
+—
+Default home feed, liveliest bars first.
+List<Bar> findByCityIgnoreCase
+String city
+City filter.
+List<Bar> findByNameContainingIgnoreCase
+String name
+Search bar on the home page.
+List<Bar> findByActivityStatus
+ActivityStatus status
+Status filter (e.g. only LIVELY).
+List<Bar> findByOwnerId
+Long ownerId
+Owner dashboard.
+long countByOwnerId
+Long ownerId
+barCount on the owner response; check before deleting an owner.
+
+5.2.4 BarTableRepository
+Method
+Parameters
+Purpose
+List<BarTable> findByBarIdOrderByLabelAsc
+Long barId
+List a bar's tables.
+List<BarTable> findByBarIdAndActiveTrueAndCapacityGreaterThanEqual
+Long barId, Integer guests
+Candidate tables for an availability search.
+boolean existsByBarIdAndLabelIgnoreCase
+Long barId, String label
+Prevent duplicate table labels within a bar.
+
+5.2.5 EventRepository
+Method
+Parameters
+Purpose
+List<Event> findByBarIdOrderByStartDateTimeAsc
+Long barId
+All events of a bar.
+List<Event> findByBarIdAndStartDateTimeAfterOrderByStartDateTimeAsc
+Long barId, LocalDateTime now
+Upcoming events of a bar.
+List<Event> findByStartDateTimeAfterOrderByStartDateTimeAsc
+LocalDateTime now
+Upcoming events at all bars (Events page).
+
+5.2.6 ReservationRepository
+Method
+Parameters
+Purpose
+boolean existsByTableIdAndReservationDateAndStartTimeLessThanAndEndTimeGreaterThanAndStatusIn
+Long tableId, LocalDate date, LocalTime end, LocalTime start, Collection<ReservationStatus> statuses
+Overlap check: an active booking on that table starts before the new one ends and ends after the new one starts. Prevents double booking.
+List<Reservation> findByHopperIdOrderByReservationDateDescStartTimeDesc
+Long hopperId
+My Bookings page.
+List<Reservation> findByHopperIdAndStatusIn
+Long hopperId, Collection<ReservationStatus>
+Find upcoming bookings to cancel when a hopper is deleted.
+List<Reservation> findByTableBarIdAndReservationDateOrderByStartTimeAsc
+Long barId, LocalDate date
+Owner's bookings page for one date.
+List<Reservation> findByTableBarIdAndReservationDateGreaterThanEqualOrderByReservationDateAsc
+Long barId, LocalDate today
+Owner's upcoming bookings; cancellations when a bar is deleted.
+long countByTableIdAndReservationDateGreaterThanEqualAndStatusIn
+Long tableId, LocalDate today, Collection<ReservationStatus>
+Block deleting a table that has upcoming bookings.
+List<Reservation> findByStatusAndReminderSentFalseAndReservationDate
+ReservationStatus status, LocalDate date
+Reminder job: confirmed bookings that have not been reminded yet.
+List<Reservation> findByReservationDateBeforeAndStatusIn
+LocalDate today, Collection<ReservationStatus>
+Nightly close-out of past bookings.
+
+5.2.7 ReviewRepository
+Method
+Parameters
+Purpose
+List<Review> findByBarIdOrderByCreatedAtDesc
+Long barId
+Reviews on a bar page.
+List<Review> findByHopperIdOrderByCreatedAtDesc
+Long hopperId
+Reviews on a hopper's profile.
+boolean existsByHopperIdAndBarId
+Long hopperId, Long barId
+One review per hopper per bar.
+long countByBarId
+Long barId
+reviewCount in bar responses.
+@Query("SELECT AVG(r.rating) FROM Review r WHERE r.bar.id = :barId") Double averageRatingForBar
+@Param Long barId
+Recalculate the bar's average rating (REQ-4.3.4).
+
+5.2.8 TimedLikeRepository
+Method
+Parameters
+Purpose
+long countByBarIdAndExpiresAtAfter
+Long barId, LocalDateTime now
+Count active likes, which determines the activity status (REQ-4.1.4).
+boolean existsByHopperIdAndBarIdAndExpiresAtAfter
+Long hopperId, Long barId, LocalDateTime now
+Block a second like while one is still active.
+List<TimedLike> findByBarIdAndExpiresAtAfter
+Long barId, LocalDateTime now
+List a bar's active likes.
+List<TimedLike> findByHopperIdAndExpiresAtAfter
+Long hopperId, LocalDateTime now
+Show "Liked" on bars the hopper currently likes.
+List<TimedLike> findByExpiresAtBefore
+LocalDateTime now
+Expiry job: find likes past 90 minutes (REQ-4.2.4).
+@Modifying @Transactional void deleteByHopperId
+Long hopperId
+Clean up when a hopper is deleted.
+

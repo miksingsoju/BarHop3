@@ -1,0 +1,4 @@
+backend/bin/
+.DS_Store
+node_modules/
+.next/
